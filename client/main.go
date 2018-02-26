@@ -7,6 +7,7 @@ import (
 	"github.com/giancarlopetrini/grpcdemo/api"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
@@ -14,7 +15,13 @@ func main() {
 	// create connection, dial, and defer its close
 	var conn *grpc.ClientConn
 
-	conn, err := grpc.Dial(":7777", grpc.WithInsecure())
+	// Create client TLS credentals
+	creds, err := credentials.NewClientTLSFromFile("cert/server.crt", "")
+	if err != nil {
+		log.Fatalf("could not load tls cert: %s", err)
+	}
+
+	conn, err = grpc.Dial("localhost:7777", grpc.WithTransportCredentials(creds))
 	if err != nil {
 		log.Fatalf("could not dial: %s", err)
 	}
