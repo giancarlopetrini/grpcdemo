@@ -17,9 +17,8 @@ import fmt "fmt"
 import math "math"
 
 import (
-	client "github.com/micro/go-micro/client"
-	server "github.com/micro/go-micro/server"
 	context "golang.org/x/net/context"
+	grpc "google.golang.org/grpc"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -55,37 +54,29 @@ func init() {
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ client.Option
-var _ server.Option
+var _ grpc.ClientConn
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Ping service
 
 type PingClient interface {
-	SayHello(ctx context.Context, in *PingMessage, opts ...client.CallOption) (*PingMessage, error)
+	SayHello(ctx context.Context, in *PingMessage, opts ...grpc.CallOption) (*PingMessage, error)
 }
 
 type pingClient struct {
-	c           client.Client
-	serviceName string
+	cc *grpc.ClientConn
 }
 
-func NewPingClient(serviceName string, c client.Client) PingClient {
-	if c == nil {
-		c = client.NewClient()
-	}
-	if len(serviceName) == 0 {
-		serviceName = "api"
-	}
-	return &pingClient{
-		c:           c,
-		serviceName: serviceName,
-	}
+func NewPingClient(cc *grpc.ClientConn) PingClient {
+	return &pingClient{cc}
 }
 
-func (c *pingClient) SayHello(ctx context.Context, in *PingMessage, opts ...client.CallOption) (*PingMessage, error) {
-	req := c.c.NewRequest(c.serviceName, "Ping.SayHello", in)
+func (c *pingClient) SayHello(ctx context.Context, in *PingMessage, opts ...grpc.CallOption) (*PingMessage, error) {
 	out := new(PingMessage)
-	err := c.c.Call(ctx, req, out, opts...)
+	err := grpc.Invoke(ctx, "/api.Ping/SayHello", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,20 +85,43 @@ func (c *pingClient) SayHello(ctx context.Context, in *PingMessage, opts ...clie
 
 // Server API for Ping service
 
-type PingHandler interface {
-	SayHello(context.Context, *PingMessage, *PingMessage) error
+type PingServer interface {
+	SayHello(context.Context, *PingMessage) (*PingMessage, error)
 }
 
-func RegisterPingHandler(s server.Server, hdlr PingHandler, opts ...server.HandlerOption) {
-	s.Handle(s.NewHandler(&Ping{hdlr}, opts...))
+func RegisterPingServer(s *grpc.Server, srv PingServer) {
+	s.RegisterService(&_Ping_serviceDesc, srv)
 }
 
-type Ping struct {
-	PingHandler
+func _Ping_SayHello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PingServer).SayHello(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Ping/SayHello",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PingServer).SayHello(ctx, req.(*PingMessage))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-func (h *Ping) SayHello(ctx context.Context, in *PingMessage, out *PingMessage) error {
-	return h.PingHandler.SayHello(ctx, in, out)
+var _Ping_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "api.Ping",
+	HandlerType: (*PingServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SayHello",
+			Handler:    _Ping_SayHello_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "api.proto",
 }
 
 func init() { proto.RegisterFile("api.proto", fileDescriptor0) }
